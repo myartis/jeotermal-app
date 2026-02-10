@@ -28,10 +28,19 @@ jobs:
         pip install --upgrade pip
         pip install python-for-android buildozer cython
     
+    - name: Accept Android SDK licenses
+      run: |
+        mkdir -p $HOME/.android
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $HOME/.android/repositories.cfg
+        yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+    
     - name: Build APK
       run: |
+        export ANDROIDSDK=/usr/local/lib/android/sdk
+        export ANDROIDNDK=/usr/local/lib/android/sdk/ndk/25.2.9519653
+        export ANDROIDAPI=33
+        export ANDROIDMINAPI=21
         buildozer android debug 2>&1 | tee build.log
-        echo "BUILD EXIT CODE: ${PIPESTATUS[0]}"
       continue-on-error: true
     
     - name: Upload build log
@@ -40,15 +49,14 @@ jobs:
         name: build-log
         path: build.log
     
-    - name: Check APK exists
+    - name: Check and upload APK
       run: |
         if [ -f bin/*.apk ]; then
-          echo "APK başarıyla oluşturuldu!"
+          echo "APK found!"
           ls -la bin/
         else
-          echo "APK oluşturulamadı!"
-          echo "=== SON 200 SATIR ==="
-          tail -200 build.log
+          echo "APK not found"
+          tail -100 build.log
           exit 1
         fi
     
