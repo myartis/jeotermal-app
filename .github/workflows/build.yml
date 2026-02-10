@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Ubuntu 22.04 daha stabil
     
     steps:
     - uses: actions/checkout@v4
@@ -14,65 +14,53 @@ jobs:
       with:
         python-version: '3.10'
     
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y python3-pip build-essential git ffmpeg \
-        libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-        libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-        zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base \
-        gstreamer1.0-plugins-good pkg-config libgl1-mesa-dev automake autoconf libtool
+        sudo dpkg --add-architecture i386
+        sudo apt-get update -qq
+        sudo apt-get install -qq -y \
+          build-essential libffi-dev libssl-dev \
+          libtool autoconf automake \
+          zlib1g-dev zlib1g:i386 \
+          libncurses5-dev libncurses5:i386 \
+          libstdc++6:i386 \
+          git unzip zip \
+          python3-pip
     
-    - name: Install python-for-android
+    - name: Install buildozer and dependencies
       run: |
-        pip install --upgrade pip
-        pip install python-for-android buildozer cython
+        pip install --upgrade pip setuptools wheel
+        pip install buildozer cython
     
-    - name: Setup Android SDK and accept licenses
+    - name: Pre-configure SDK licenses
       run: |
-        # SDK dizinini oluştur
-        mkdir -p $HOME/.android
-        touch $HOME/.android/repositories.cfg
-        
-        # Lisansları otomatik kabul et
-        yes | $HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
-        
-        # Build tools'u kur
-        $HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager "build-tools;33.0.0" "platforms;android-33" || true
+        mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
     
     - name: Build APK
       run: |
-        # Ortam değişkenlerini ayarla
-        export ANDROIDSDK=$HOME/.buildozer/android/platform/android-sdk
-        export ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk-r25b
-        export ANDROIDAPI=33
-        export ANDROIDMINAPI=21
-        
-        # Build
         buildozer android debug 2>&1 | tee build.log
-      continue-on-error: true
+      env:
+        BUILDOZER_WARN_ON_ROOT: 0
     
-    - name: Upload build log
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: build-log
-        path: build.log
+        name: build-artifacts
+        path: |
+          build.log
+          bin/*.apk
     
-    - name: Check and upload APK
+    - name: Check APK
       run: |
-        if ls bin/*.apk 1> /dev/null 2>&1; then
-          echo "✅ APK başarıyla oluşturuldu!"
+        if [ -f "bin/"*.apk ]; then
+          echo "✅ APK BAŞARIYLA OLUŞTURULDU!"
           ls -lh bin/*.apk
         else
-          echo "❌ APK oluşturulamadı"
-          echo "Son 100 satır:"
-          tail -100 build.log
+          echo "❌ APK bulunamadı"
+          tail -50 build.log
           exit 1
         fi
-    
-    - name: Upload APK
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: jeotermal-apk
-        path: bin/*.apk
