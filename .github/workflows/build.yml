@@ -28,18 +28,27 @@ jobs:
         pip install --upgrade pip
         pip install python-for-android buildozer cython
     
-    - name: Accept Android SDK licenses
+    - name: Setup Android SDK and accept licenses
       run: |
+        # SDK dizinini oluştur
         mkdir -p $HOME/.android
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $HOME/.android/repositories.cfg
-        yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        touch $HOME/.android/repositories.cfg
+        
+        # Lisansları otomatik kabul et
+        yes | $HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
+        
+        # Build tools'u kur
+        $HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager "build-tools;33.0.0" "platforms;android-33" || true
     
     - name: Build APK
       run: |
-        export ANDROIDSDK=/usr/local/lib/android/sdk
-        export ANDROIDNDK=/usr/local/lib/android/sdk/ndk/25.2.9519653
+        # Ortam değişkenlerini ayarla
+        export ANDROIDSDK=$HOME/.buildozer/android/platform/android-sdk
+        export ANDROIDNDK=$HOME/.buildozer/android/platform/android-ndk-r25b
         export ANDROIDAPI=33
         export ANDROIDMINAPI=21
+        
+        # Build
         buildozer android debug 2>&1 | tee build.log
       continue-on-error: true
     
@@ -51,11 +60,12 @@ jobs:
     
     - name: Check and upload APK
       run: |
-        if [ -f bin/*.apk ]; then
-          echo "APK found!"
-          ls -la bin/
+        if ls bin/*.apk 1> /dev/null 2>&1; then
+          echo "✅ APK başarıyla oluşturuldu!"
+          ls -lh bin/*.apk
         else
-          echo "APK not found"
+          echo "❌ APK oluşturulamadı"
+          echo "Son 100 satır:"
           tail -100 build.log
           exit 1
         fi
