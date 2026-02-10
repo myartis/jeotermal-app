@@ -21,7 +21,7 @@ jobs:
         libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
         libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
         zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base \
-        gstreamer1.0-plugins-good pkg-config libgl1-mesa-dev
+        gstreamer1.0-plugins-good pkg-config libgl1-mesa-dev automake autoconf libtool
     
     - name: Install python-for-android
       run: |
@@ -30,17 +30,31 @@ jobs:
     
     - name: Build APK
       run: |
-        buildozer android debug 2>&1 | tee build.log || true
-        # Eğer hata varsa logu göster
-        if [ ! -f bin/*.apk ]; then
-          echo "APK oluşturulamadı, son 50 satır:"
-          tail -50 build.log
+        buildozer android debug 2>&1 | tee build.log
+        echo "BUILD EXIT CODE: ${PIPESTATUS[0]}"
+      continue-on-error: true
+    
+    - name: Upload build log
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build.log
+    
+    - name: Check APK exists
+      run: |
+        if [ -f bin/*.apk ]; then
+          echo "APK başarıyla oluşturuldu!"
+          ls -la bin/
+        else
+          echo "APK oluşturulamadı!"
+          echo "=== SON 200 SATIR ==="
+          tail -200 build.log
           exit 1
         fi
     
     - name: Upload APK
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: jeotermal-apk
         path: bin/*.apk
-        if-no-files-found: warn
