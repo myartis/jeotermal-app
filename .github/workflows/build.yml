@@ -21,15 +21,26 @@ jobs:
         libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
         libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
         zlib1g-dev libgstreamer1.0 gstreamer1.0-plugins-base \
-        gstreamer1.0-plugins-good
-        pip install buildozer cython
+        gstreamer1.0-plugins-good pkg-config libgl1-mesa-dev
+    
+    - name: Install python-for-android
+      run: |
+        pip install --upgrade pip
+        pip install python-for-android buildozer cython
     
     - name: Build APK
       run: |
-        yes | buildozer android debug
+        buildozer android debug 2>&1 | tee build.log || true
+        # Eğer hata varsa logu göster
+        if [ ! -f bin/*.apk ]; then
+          echo "APK oluşturulamadı, son 50 satır:"
+          tail -50 build.log
+          exit 1
+        fi
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: jeotermal-apk
         path: bin/*.apk
+        if-no-files-found: warn
